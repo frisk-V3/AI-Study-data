@@ -1,17 +1,17 @@
-name: frisk-v3-Infinite-Fullpower-Loop
+name: frisk-v3-Infinite-1Hour-Cycle
 on:
   push:
     branches:
-      - main  # 修正してプッシュした瞬間に一発目が起動！
+      - main  # プッシュした瞬間に最初のサイクルが起動
   repository_dispatch:
-    types: [restart_loop] # 1時間休憩後の自動再起動用
-  workflow_dispatch: # 手動でポチりたい時用
+    types: [restart_loop] # 40分休憩後の自動再起動用
+  workflow_dispatch: # 手動ボタン用
 
 jobs:
   train-cycle:
     runs-on: ubuntu-latest
     permissions:
-      contents: write # これで data/ フォルダへの書き込みを許可！
+      contents: write # data/ フォルダへの書き込みを許可
     
     steps:
       - name: Checkout frisk-V3 Core
@@ -25,28 +25,28 @@ jobs:
       - name: Install dependencies
         run: pip install requests
 
-      # 20分間、Wikipediaから詳細データを抜きまくる
+      # 1. 20分間の全力学習 (詳細データをJSONに蓄積)
       - name: Run 20-Minute Hard Training
         run: python src/train_engine.py
 
-      # 学習結果（詳細入りJSON）をリポジトリにプッシュ
+      # 2. 学習成果をリポジトリに保存
       - name: Sync Learned Data
         run: |
           git config --local user.email "yuniaochaoyang@gmail.com"
           git config --local user.name "frisk-V3"
           git add data/*.json
-          # [skip ci] を入れることで、このプッシュで二重にActionが動くのを防ぐ！
+          # [skip ci] で二重起動を防止しつつ、進捗を刻む
           git commit -m "frisk-V3 Brain Update: $(date +'%H:%M') [skip ci]" || exit 0
           git push
 
-      # 1時間の休憩 ＋ 次の自分を呼び出し
-      - name: 1 Hour Interval and Auto-Restart
+      # 3. 40分間の休憩（20分学習 + 40分休 = ちょうど1時間）
+      - name: 40 Minute Break and Auto-Restart
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "20分の全力学習完了。詳細データを保存しました。"
-          echo "サーバー負荷軽減のため、1時間休憩して次を予約します..."
-          sleep 3600
+          echo "20分の本気学習完了。詳細データを保存しました。"
+          echo "40分休憩して、次の正時（あるいは1時間後）に再起動します..."
+          sleep 2400 # 2400秒 = 40分
           
           curl -X POST \
           -H "Authorization: Bearer $GITHUB_TOKEN" \
