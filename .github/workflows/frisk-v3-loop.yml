@@ -1,17 +1,17 @@
-name: frisk-v3-AutoCommit-Loop
+name: frisk-v3-Infinite-Fullpower-Loop
 on:
   push:
     branches:
-      - main  # メインブランチにコミット（プッシュ）したら即起動
+      - main  # 修正してプッシュした瞬間に一発目が起動！
   repository_dispatch:
-    types: [restart_loop] # 休憩後の自動再起動用
-  workflow_dispatch: # 手動ボタンも一応残しておく
+    types: [restart_loop] # 1時間休憩後の自動再起動用
+  workflow_dispatch: # 手動でポチりたい時用
 
 jobs:
   train-cycle:
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: write # これで data/ フォルダへの書き込みを許可！
     
     steps:
       - name: Checkout frisk-V3 Core
@@ -25,28 +25,31 @@ jobs:
       - name: Install dependencies
         run: pip install requests
 
-      # 20分間の全力学習
+      # 20分間、Wikipediaから詳細データを抜きまくる
       - name: Run 20-Minute Hard Training
         run: python src/train_engine.py
 
-      # 学習データをプッシュ（[skip ci]を入れて無限ループの衝突を防ぐ）
+      # 学習結果（詳細入りJSON）をリポジトリにプッシュ
       - name: Sync Learned Data
         run: |
           git config --local user.email "yuniaochaoyang@gmail.com"
           git config --local user.name "frisk-V3"
           git add data/*.json
-          # [skip ci] を入れることで、このプッシュ自体でActionが再起動するのを防ぐ
+          # [skip ci] を入れることで、このプッシュで二重にActionが動くのを防ぐ！
           git commit -m "frisk-V3 Brain Update: $(date +'%H:%M') [skip ci]" || exit 0
           git push
 
-      # 1時間の休憩 ＋ 再起動
+      # 1時間の休憩 ＋ 次の自分を呼び出し
       - name: 1 Hour Interval and Auto-Restart
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "サイクル完了。1時間休憩します。"
+          echo "20分の全力学習完了。詳細データを保存しました。"
+          echo "サーバー負荷軽減のため、1時間休憩して次を予約します..."
           sleep 3600
-          curl -X POST -H "Authorization: Bearer $GITHUB_TOKEN" \
+          
+          curl -X POST \
+          -H "Authorization: Bearer $GITHUB_TOKEN" \
           -H "Accept: application/vnd.github.v3+json" \
           https://api.github.com{{ github.repository }}/dispatches \
           -d '{"event_type": "restart_loop"}'
