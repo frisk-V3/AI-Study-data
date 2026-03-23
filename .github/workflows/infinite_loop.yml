@@ -1,17 +1,17 @@
-name: Continuous 24/7 AI Training
+name: frisk-v3-HighPerformance-Loop
 on:
-  workflow_dispatch: # 初回のみ手動で「Run workflow」ボタンを押して起動
+  workflow_dispatch:
   repository_dispatch:
-    types: [restart_loop] # 1時間の休憩後に自分を呼び出す用
+    types: [restart_loop]
 
 jobs:
-  train-and-rest:
+  train-cycle:
     runs-on: ubuntu-latest
     permissions:
-      contents: write # dataフォルダへの書き込み権限
+      contents: write
     
     steps:
-      - name: Checkout Repository
+      - name: Checkout frisk-V3 Core
         uses: actions/checkout@v4
 
       - name: Set up Python
@@ -19,31 +19,30 @@ jobs:
         with:
           python-version: '3.10'
 
-      # 1. 3時間の学習フェーズ (src/train_engine.py を実行)
-      - name: Run 3-Hour Training
+      - name: Install dependencies
+        run: pip install requests
+
+      # 20分間、全力でWikipediaからデータを抜いてJSON化
+      - name: Run 20-Minute Hard Training
         run: python src/train_engine.py
 
-      # 2. 学習成果（data/*.json）をリポジトリにプッシュ
-      - name: Push Learned Data to Repository
+      # 学習データを即プッシュ
+      - name: Sync Learned Data
         run: |
-          git config --local user.email "bot@github.com"
-          git config --local user.name "AI-Self-Trainer"
+          git config --local user.email "yuniaochaoyang@gmail.com"
+          git config --local user.name "frisk-V3"
           git add data/*.json
-          # 変更があればコミット、なければスルー
-          git commit -m "Auto-update learned data: $(date +'%Y-%m-%d %H:%M')" || exit 0
+          git commit -m "frisk-V3 Brain Update: $(date +'%H:%M')" || exit 0
           git push
 
-      # 3. 1時間の休憩フェーズ（負荷軽減）
-      - name: 1 Hour Break and Restart
+      # 1時間のインターバル（サーバーを休ませつつ次を予約）
+      - name: 1 Hour Interval and Auto-Restart
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "学習完了。サーバー負荷軽減のため1時間休憩します..."
-          sleep 3600 # 3600秒 = 1時間
-          
-          echo "休憩終了。次のサイクルを起動します。"
-          curl -X POST \
-          -H "Authorization: Bearer $GITHUB_TOKEN" \
+          echo "20分の本気学習完了。1時間休憩して再起動します。"
+          sleep 3600
+          curl -X POST -H "Authorization: Bearer $GITHUB_TOKEN" \
           -H "Accept: application/vnd.github.v3+json" \
           https://api.github.com{{ github.repository }}/dispatches \
           -d '{"event_type": "restart_loop"}'
