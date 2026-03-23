@@ -1,8 +1,11 @@
-name: frisk-v3-HighPerformance-Loop
+name: frisk-v3-AutoCommit-Loop
 on:
-  workflow_dispatch:
+  push:
+    branches:
+      - main  # メインブランチにコミット（プッシュ）したら即起動
   repository_dispatch:
-    types: [restart_loop]
+    types: [restart_loop] # 休憩後の自動再起動用
+  workflow_dispatch: # 手動ボタンも一応残しておく
 
 jobs:
   train-cycle:
@@ -22,25 +25,26 @@ jobs:
       - name: Install dependencies
         run: pip install requests
 
-      # 20分間、全力でWikipediaからデータを抜いてJSON化
+      # 20分間の全力学習
       - name: Run 20-Minute Hard Training
         run: python src/train_engine.py
 
-      # 学習データを即プッシュ
+      # 学習データをプッシュ（[skip ci]を入れて無限ループの衝突を防ぐ）
       - name: Sync Learned Data
         run: |
           git config --local user.email "yuniaochaoyang@gmail.com"
           git config --local user.name "frisk-V3"
           git add data/*.json
-          git commit -m "frisk-V3 Brain Update: $(date +'%H:%M')" || exit 0
+          # [skip ci] を入れることで、このプッシュ自体でActionが再起動するのを防ぐ
+          git commit -m "frisk-V3 Brain Update: $(date +'%H:%M') [skip ci]" || exit 0
           git push
 
-      # 1時間のインターバル（サーバーを休ませつつ次を予約）
+      # 1時間の休憩 ＋ 再起動
       - name: 1 Hour Interval and Auto-Restart
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "20分の本気学習完了。1時間休憩して再起動します。"
+          echo "サイクル完了。1時間休憩します。"
           sleep 3600
           curl -X POST -H "Authorization: Bearer $GITHUB_TOKEN" \
           -H "Accept: application/vnd.github.v3+json" \
