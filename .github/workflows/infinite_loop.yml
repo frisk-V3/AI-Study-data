@@ -1,0 +1,49 @@
+name: Continuous 24/7 AI Training
+on:
+  workflow_dispatch: # 初回のみ手動で「Run workflow」ボタンを押して起動
+  repository_dispatch:
+    types: [restart_loop] # 1時間の休憩後に自分を呼び出す用
+
+jobs:
+  train-and-rest:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # dataフォルダへの書き込み権限
+    
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      # 1. 3時間の学習フェーズ (src/train_engine.py を実行)
+      - name: Run 3-Hour Training
+        run: python src/train_engine.py
+
+      # 2. 学習成果（data/*.json）をリポジトリにプッシュ
+      - name: Push Learned Data to Repository
+        run: |
+          git config --local user.email "bot@github.com"
+          git config --local user.name "AI-Self-Trainer"
+          git add data/*.json
+          # 変更があればコミット、なければスルー
+          git commit -m "Auto-update learned data: $(date +'%Y-%m-%d %H:%M')" || exit 0
+          git push
+
+      # 3. 1時間の休憩フェーズ（負荷軽減）
+      - name: 1 Hour Break and Restart
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "学習完了。サーバー負荷軽減のため1時間休憩します..."
+          sleep 3600 # 3600秒 = 1時間
+          
+          echo "休憩終了。次のサイクルを起動します。"
+          curl -X POST \
+          -H "Authorization: Bearer $GITHUB_TOKEN" \
+          -H "Accept: application/vnd.github.v3+json" \
+          https://api.github.com{{ github.repository }}/dispatches \
+          -d '{"event_type": "restart_loop"}'
